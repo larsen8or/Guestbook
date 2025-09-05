@@ -1,8 +1,16 @@
 <?php
 // Start session and include required files
 session_start();
-require_once 'includes/db.php';
-require_once 'includes/emoji_functions.php';
+
+try {
+    // Get database connection
+    $pdo = require_once 'includes/db.php';
+    
+    // Include emoji functions
+    require_once 'includes/emoji_functions.php';
+    
+    // Initialize error variable
+    $error = null;
 
 // Set CSRF token if not already set
 if (empty($_SESSION['csrf_token'])) {
@@ -19,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['csrf_token'])) {
     $message = trim($_POST['message'] ?? '');
     $ip = $_SERVER['REMOTE_ADDR'];
     $user_agent = $_SERVER['HTTP_USER_AGENT'];
-
+    
     // Validate input
     if (empty($name) || empty($message)) {
         $error = 'Begge felter skal udfyldes';
@@ -28,42 +36,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['csrf_token'])) {
     } elseif (strlen($message) > 1000) {
         $error = 'Beskeden må maksimalt være 1000 tegn';
     } else {
-        // Save to database
-        $stmt = $pdo->prepare("INSERT INTO entries (name, message,
-                     ip_address, user_agent) VALUES (?, ?, ?, ?)");
-        if ($stmt->execute([$name, $message, $ip, $user_agent])) {
-            // Set cookie with user's name
-            setcookie('guestbook_name', $name, time() + (86400 * 30), "/");
-            // 30 days
-
-            // Redirect to prevent form resubmission
-            header('Location: ' . $_SERVER['PHP_SELF'] . '?success=1');
-            exit;
-        } else {
-            $error = 'Der opstod en fejl under indsendelsen. Prøv igen senere.';
+        try {
+            // Save to database
+            $stmt = $pdo->prepare("INSERT INTO entries (name, message, ip_address, user_agent) VALUES (?, ?, ?, ?)");
+            if ($stmt->execute([$name, $message, $ip, $user_agent])) {
+                // Set cookie with user's name
+                setcookie('guestbook_name', $name, time() + (86400 * 30), "/");
+                
+                // Redirect to prevent form resubmission
+                header('Location: ' . $_SERVER['PHP_SELF'] . '?success=1');
+                exit;
+            } else {
+                $error = 'Der opstod en fejl under indsendelsen. Prøv igen senere.';
+            }
+        } catch (PDOException $e) {
+            $error = 'Databasefejl: ' . $e->getMessage();
         }
     }
 }
 
-// First, check if the is_approved column exists
-$columnExists = false;
+    // First, check if the is_approved column exists
+    $columnExists = false;
 try {
     $test = $pdo->query("SELECT is_approved FROM entries LIMIT 1");
     $columnExists = true;
 } catch (PDOException $e) {
-    // Column doesn't exist, we'll handle this case
+    $error = "Database error: " . $e->getMessage();
     $columnExists = false;
 }
 
-// Get all entries (filter by is_approved if the column exists)
-$query = "SELECT * FROM entries";
-if ($columnExists) {
-    $query .= " WHERE is_approved = 1";
-}
-$query .= " ORDER BY created_at DESC";
+    // Get all entries (filter by is_approved if the column exists)
+    $query = "SELECT * FROM entries";
+    if ($columnExists) {
+        $query .= " WHERE is_approved = 1";
+    }
+    $query .= " ORDER BY created_at DESC";
 
-$stmt = $pdo->query($query);
-$entries = $stmt->fetchAll();
+    $stmt = $pdo->query($query);
+    $entries = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $error = 'Database error: ' . $e->getMessage();
+    $entries = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="da">

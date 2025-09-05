@@ -8,6 +8,7 @@ if (!is_dir($db_dir)) {
     mkdir($db_dir, 0755, true);
 }
 
+// Initialize PDO connection
 try {
     // Connect to SQLite database
     $pdo = new PDO("sqlite:$db_file");
@@ -26,12 +27,15 @@ try {
         )
     ");
     
+    // Set character encoding
+    $pdo->exec('PRAGMA encoding = "UTF-8"');
+    
 } catch (PDOException $e) {
     // Log error and show user-friendly message
     error_log('Database Error: ' . $e->getMessage());
     die('Der opstod en databasefejl. Prøv venligst igen senere.');
 }
 
-// Set character encoding
-$pdo->exec('PRAGMA encoding = "UTF-8"');
+// Make sure $pdo is available in global scope
+return $pdo;
 ?>
