@@ -1,7 +1,8 @@
 <?php
-// Start session and include database connection
+// Start session and include required files
 session_start();
 require_once 'includes/db.php';
+require_once 'includes/emoji_functions.php';
 
 // Set CSRF token if not already set
 if (empty($_SESSION['csrf_token'])) {
@@ -178,7 +179,12 @@ $entries = $stmt->fetchAll();
                                             </span>
                                         </div>
                                         <div style="color: #333; line-height: 1.6;">
-                                            <?php echo nl2br(htmlspecialchars($entry['message'])); ?>
+                                            <?php 
+                                            // Convert text smileys to emojis before displaying
+                                            $message = htmlspecialchars($entry['message']);
+                                            $message = convertSmileysToEmojis($message);
+                                            echo nl2br($message); 
+                                            ?>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
